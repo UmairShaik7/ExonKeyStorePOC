@@ -6,11 +6,15 @@ import android.util.Base64;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.cert.CertificateException;
 import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -29,11 +33,10 @@ public final class Utils {
     private static final String principleName = "CN=Sample Name, O=Android Authority";
     private static KeyStore.PasswordProtection protParam;
 
-    public static KeyStore InitializeKeyStore(KeyStore keyStore) throws Exception {
-        keyStore = KeyStore.getInstance(androidKeyStore);
+    public static KeyStore initializeKeyStore() throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
+        final KeyStore keyStore = KeyStore.getInstance(androidKeyStore);
         keyStore.load(null);
-        protParam =
-                new KeyStore.PasswordProtection(passwordKey.toCharArray());
+        protParam = new KeyStore.PasswordProtection(passwordKey.toCharArray());
         return keyStore;
     }
 
@@ -66,11 +69,6 @@ public final class Utils {
         KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(alias, protParam);
         RSAPublicKey publicKey = (RSAPublicKey) privateKeyEntry.getCertificate().getPublicKey();
 
-        /* if(initialText.isEmpty()) {
-                Toast.makeText(this, "Enter text in the 'Initial Text' widget", Toast.LENGTH_LONG).show();
-                return;
-            }*/
-
         Cipher inCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding", "AndroidKeyStoreBCWorkaround");
         inCipher.init(Cipher.ENCRYPT_MODE, publicKey);
 
@@ -86,8 +84,6 @@ public final class Utils {
     }
 
     public static String decryptString(String textToDecrypt, KeyStore keyStore) throws Exception {
-       /**/
-
         KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(alias, protParam);
         PrivateKey privateKey = privateKeyEntry.getPrivateKey();
 

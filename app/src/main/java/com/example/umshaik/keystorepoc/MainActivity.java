@@ -52,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
             keyStore.load(null);
             protParam =
                     new KeyStore.PasswordProtection("password".toCharArray());*/
-            keyStore = Utils.InitializeKeyStore(keyStore);
+            keyStore = Utils.initializeKeyStore();
         } catch (Exception e) {
             e.printStackTrace();
         }
