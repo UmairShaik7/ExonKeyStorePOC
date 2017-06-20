@@ -1,12 +1,11 @@
 package com.example.umshaik.keystorepoc;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.security.KeyPairGeneratorSpec;
+import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,24 +17,15 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.math.BigInteger;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Enumeration;
 import java.util.List;
 
-import javax.crypto.Cipher;
-import javax.crypto.CipherInputStream;
-import javax.crypto.CipherOutputStream;
-import javax.security.auth.x500.X500Principal;
+import static com.example.umshaik.keystorepoc.Utils.alias;
+import static com.example.umshaik.keystorepoc.Utils.decryptString;
+import static com.example.umshaik.keystorepoc.Utils.encryptString;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -44,21 +34,28 @@ public class MainActivity extends AppCompatActivity {
     static final String CIPHER_PROVIDER = "AndroidOpenSSL";
 
     EditText aliasText;
-    EditText startText, decryptedText, encryptedText;
+    EditText startText;
+    TextView decryptedText;
+    TextView encryptedText;
     List<String> keyAliases;
     ListView listView;
     KeyRecyclerAdapter listAdapter;
 
     KeyStore keyStore;
+    private KeyStore.PasswordProtection protParam;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
-            keyStore = KeyStore.getInstance("AndroidKeyStore");
+           /* keyStore = KeyStore.getInstance("AndroidKeyStore");
             keyStore.load(null);
+            protParam =
+                    new KeyStore.PasswordProtection("password".toCharArray());*/
+            keyStore = Utils.InitializeKeyStore(keyStore);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        catch(Exception e) {}
         refreshKeys();
 
         setContentView(R.layout.activity_main);
@@ -66,8 +63,8 @@ public class MainActivity extends AppCompatActivity {
         View listHeader = View.inflate(this, R.layout.activity_main_header, null);
         aliasText = (EditText) listHeader.findViewById(R.id.aliasText);
         startText = (EditText) listHeader.findViewById(R.id.startText);
-        decryptedText = (EditText) listHeader.findViewById(R.id.decryptedText);
-        encryptedText = (EditText) listHeader.findViewById(R.id.encryptedText);
+        decryptedText = (TextView) listHeader.findViewById(R.id.decryptedText);
+        encryptedText = (TextView) listHeader.findViewById(R.id.encryptedText);
 
         listView = (ListView) findViewById(R.id.listView);
         listView.addHeaderView(listHeader);
@@ -82,21 +79,21 @@ public class MainActivity extends AppCompatActivity {
             while (aliases.hasMoreElements()) {
                 keyAliases.add(aliases.nextElement());
             }
+        } catch (Exception e) {
         }
-        catch(Exception e) {}
 
-        if(listAdapter != null)
+        if (listAdapter != null)
             listAdapter.notifyDataSetChanged();
     }
 
     public void createNewKeys(View view) {
-        String alias = aliasText.getText().toString();
+       /* String alias = aliasText.getText().toString();
         try {
             // Create new key if needed
             if (!keyStore.containsAlias(alias)) {
                 Calendar start = Calendar.getInstance();
                 Calendar end = Calendar.getInstance();
-                end.add(Calendar.YEAR, 1);
+                end.add(Calendar.YEAR, 25);
                 KeyPairGeneratorSpec spec = new KeyPairGeneratorSpec.Builder(this)
                         .setAlias(alias)
                         .setSubject(new X500Principal("CN=Sample Name, O=Android Authority"))
@@ -112,11 +109,16 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             Toast.makeText(this, "Exception " + e.getMessage() + " occured", Toast.LENGTH_LONG).show();
             Log.e(TAG, Log.getStackTraceString(e));
+        }*/
+        try {
+            Utils.createNewKeys(aliasText.getText().toString(), this, keyStore);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         refreshKeys();
     }
 
-    public void deleteKey(final String alias) {
+    public void deleteKey() {
         AlertDialog alertDialog =new AlertDialog.Builder(this)
                 .setTitle("Delete Key")
                 .setMessage("Do you want to delete the key \"" + alias + "\" from the keystore?")
@@ -124,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
                     public void onClick(DialogInterface dialog, int which) {
                         try {
                             keyStore.deleteEntry(alias);
-                            refreshKeys();
+                            //refreshKeys();
                         } catch (KeyStoreException e) {
                             Toast.makeText(MainActivity.this,
                                     "Exception " + e.getMessage() + " occured",
@@ -141,11 +143,17 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .create();
         alertDialog.show();
+        try {
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        refreshKeys();
     }
 
-    public void encryptString(String alias) {
+    /*public void encryptString(String alias) {
         try {
-            KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry)keyStore.getEntry(alias, null);
+            KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry)keyStore.getEntry(alias, protParam);
             RSAPublicKey publicKey = (RSAPublicKey) privateKeyEntry.getCertificate().getPublicKey();
 
             String initialText = startText.getText().toString();
@@ -154,7 +162,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            Cipher inCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding", "AndroidOpenSSL");
+            Cipher inCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding", "AndroidKeyStoreBCWorkaround");
             inCipher.init(Cipher.ENCRYPT_MODE, publicKey);
 
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -169,14 +177,16 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Exception " + e.getMessage() + " occured", Toast.LENGTH_LONG).show();
             Log.e(TAG, Log.getStackTraceString(e));
         }
-    }
+    }*/
 
-    public void decryptString(String alias) {
+    /*public void decryptString(String alias) {
         try {
-            KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry)keyStore.getEntry(alias, null);
-            RSAPrivateKey privateKey = (RSAPrivateKey) privateKeyEntry.getPrivateKey();
 
-            Cipher output = Cipher.getInstance("RSA/ECB/PKCS1Padding", "AndroidOpenSSL");
+
+            KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry)keyStore.getEntry(alias, protParam);
+            PrivateKey privateKey = privateKeyEntry.getPrivateKey();
+
+            Cipher output = Cipher.getInstance("RSA/ECB/PKCS1Padding", "AndroidKeyStoreBCWorkaround");
             output.init(Cipher.DECRYPT_MODE, privateKey);
 
             String cipherText = encryptedText.getText().toString();
@@ -200,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Exception " + e.getMessage() + " occured", Toast.LENGTH_LONG).show();
             Log.e(TAG, Log.getStackTraceString(e));
         }
-    }
+    }*/
 
     public class KeyRecyclerAdapter extends ArrayAdapter<String> {
 
@@ -215,7 +225,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            View itemView = LayoutInflater.from(parent.getContext()).
+            @SuppressLint("ViewHolder") View itemView = LayoutInflater.from(parent.getContext()).
                     inflate(R.layout.list_item, parent, false);
 
             final TextView keyAlias = (TextView) itemView.findViewById(R.id.keyAlias);
@@ -224,21 +234,30 @@ public class MainActivity extends AppCompatActivity {
             encryptButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    encryptString(keyAlias.getText().toString());
+                    try {
+                        encryptedText.setText(encryptString(startText.getText().toString(), keyStore));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             });
             Button decryptButton = (Button) itemView.findViewById(R.id.decryptButton);
             decryptButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    decryptString(keyAlias.getText().toString());
+                    try {
+                        decryptedText.setText(decryptString(encryptedText.getText().toString(), keyStore));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             });
             final Button deleteButton = (Button) itemView.findViewById(R.id.deleteButton);
             deleteButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    deleteKey(keyAlias.getText().toString());
+                    deleteKey();
+                    //   refreshKeys();
                 }
             });
 
